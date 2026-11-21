@@ -1,0 +1,48 @@
+---
+import Base from "../layouts/Base.astro";
+import { isPlatformHost } from "../lib/host";
+
+// 图床说明是平台页面，只在主站提供；租户博客不出现
+if (!isPlatformHost(Astro.url.host)) {
+	return new Response("Not Found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+---
+
+<Base title="图片外链" description="本站不托管图片，请使用 img.yerin.dpdns.org 上传后粘贴外链。">
+	<section class="frame" style="padding:64px 0 96px;max-width:820px">
+		<p style="font-size:12px;letter-spacing:.18em;color:var(--color-text-secondary);margin:0 0 12px">IMAGES</p>
+		<h1 style="font-size:42px;line-height:1.2;margin:0 0 18px;font-weight:600;letter-spacing:-.02em">
+			图片只走外链。
+		</h1>
+		<p style="font-size:16px;line-height:1.9;color:var(--color-text-secondary);margin:0 0 32px">
+			为了把免费额度留给页面访问，本站不提供图片上传，也不占用对象存储。所有图片请先上传到图床，再把地址粘贴到文章里。
+		</p>
+
+		<div style="border:1px solid var(--color-border,rgba(0,0,0,.12));border-radius:16px;padding:26px 28px;margin-bottom:22px;background:var(--color-surface)">
+			<div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px">图床地址</div>
+			<a
+				href="https://img.yerin.dpdns.org"
+				target="_blank"
+				rel="noopener"
+				style="font-size:24px;font-weight:600;letter-spacing:-.01em;text-decoration:none;color:var(--color-text)"
+			>
+				img.yerin.dpdns.org →
+			</a>
+		</div>
+
+		<ol style="font-size:15px;line-height:2;color:var(--color-text-secondary);padding-left:22px;margin:0 0 32px">
+			<li>打开图床，上传图片</li>
+			<li>复制图片的直链（以 https:// 开头）</li>
+			<li>回到编辑器，插入图片块或直接粘贴链接</li>
+			<li>保存后前台就会按外链加载</li>
+		</ol>
+
+		<div style="border-left:3px solid #f0c36d;background:#fff8e6;color:#7a5b12;padding:14px 18px;border-radius:0 10px 10px 0;font-size:14px;line-height:1.8">
+			不要粘贴图床的“页面地址”，要用图片本身的直链；否则前台会加载失败。上传大小与格式限制以图床页面上的说明为准。
+		</div>
+
+		<p style="margin-top:28px;font-size:13px;color:var(--color-text-secondary)">
+			旧的站内图片链接会返回 410，并在正文里提示改用量外链。
+		</p>
+	</section>
+</Base>

@@ -1,0 +1,109 @@
+---
+import OpsShell from "../../layouts/OpsShell.astro";
+import { env } from "cloudflare:workers";
+import { isOpsAuthed } from "../../lib/ops-auth";
+import { ensurePlatformTables, querySites, siteStats } from "../../lib/platform";
+import { getTraffic, slugOfHost } from "../../lib/stats";
+
+await ensurePlatformTables();
+
+const authed = isOpsAuthed(Astro.cookies, env as any);
+const base = "yerinblog.cc.cd";
+
+const url = Astro.url;
+const q = (url.searchParams.get("q") || "").trim();
+const status = (url.searchParams.get("status") || "all") as "all" | "on" | "off";
+const sort = (url.searchParams.get("sort") || "new") as "new" | "old" | "name";
+const page = Math.max(1, Number(url.searchParams.get("page") || 1));
+
+let rows: Awaited<ReturnType<typeof querySites>>["rows"] = [];
+let total = 0, pages = 1;
+let stats = { total: 0, active: 0, disabled: 0 };
+let bySlug: Record<string, number> = {};
+if (authed) {
+	const res = await querySites({ q, status, sort, page, pageSize: 20 });
+	rows = res.rows;
+	total = res.total;
+	pages = res.pages;
+	stats = await siteStats();
+	const traffic = await getTraffic();
+	bySlug = Object.fromEntries(
+		Object.entries(traffic.byHost).map(([host, v]) => [slugOfHost(host), v.today])
+	);
+}
+
+const qs = (patch: Record<string, string | number>) => {
+	const next = new URLSearchParams(url.search);
+	for (const [k, v] of Object.entries(patch)) next.set(k, String(v));
+	return `/ops/sites?${next.toString()}`;
+};
+const back = `/ops/sites${url.search}`;
+---
+
+<OpsShell title="站点" sub={`共 ${total} 个 · 运行中 ${stats.active} · 已停用 ${stats.disabled}`} active="sites" authed={authed}>
+	<form method="get" action="/ops/sites" class="row" style="margin-bottom:14px">
+		<input type="text" name="q" value={q} placeholder="搜索子域或名称" style="max-width:280px" />
+		<select name="status" style="max-width:140px">
+			<option value="all" selected={status === "all"}>全部状态</option>
+			<option value="on" selected={status === "on"}>运行中</option>
+			<option value="off" selected={status === "off"}>已停用</option>
+		</select>
+		<select name="sort" style="max-width:140px">
+			<option value="new" selected={sort === "new"}>最新优先</option>
+			<option value="old" selected={sort === "old"}>最早优先</option>
+			<option value="name" selected={sort === "name"}>按字母</option>
+		</select>
+		<button class="btn primary" type="submit">筛选</button>
+		<a class="btn" href="/ops/sites">重置</a>
+	</form>
+
+	<div class="card" style="padding:6px 8px">
+		<table>
+			<thead>
+				<tr><th>子域</th><th>名称</th><th>状态</th><th>今日访问</th><th>注册 IP</th><th>创建时间</th><th style="width:300px">操作</th></tr>
+			</thead>
+			<tbody>
+				{rows.length === 0 && <tr><td colspan="7" class="muted" style="padding:28px;text-align:center">没有匹配的站点</td></tr>}
+				{rows.map((s) => (
+					<tr>
+						<td><a href={`/ops/site/${s.id}`}>{s.id}</a></td>
+						<td>{s.title}</td>
+						<td><span class={`badge ${s.status ? "on" : "off"}`}>{s.status ? "运行中" : "已停用"}</span></td>
+						<td>{(bySlug[s.id] || 0).toLocaleString()}</td>
+						<td class="muted">{s.ip}</td>
+						<td class="muted">{new Date(s.created * 1000).toLocaleString("zh-CN", { hour12: false })}</td>
+						<td>
+							<div class="row" style="gap:6px">
+								<form method="post" action="/api/ops/site" style="margin:0">
+									<input type="hidden" name="id" value={s.id} />
+									<input type="hidden" name="back" value={back} />
+									<button class="btn" name="action" value={s.status ? "disable" : "enable"} type="submit">{s.status ? "停用" : "启用"}</button>
+								</form>
+								<a class="btn" href={`https://${s.id}.${base}/_emdash/admin`} target="_blank" rel="noopener">后台 ↗</a>
+								<form method="post" action="/api/ops/site" style="margin:0;display:flex;gap:4px" onsubmit="return true">
+									<input type="hidden" name="id" value={s.id} />
+									<input type="hidden" name="back" value={back} />
+									<input type="text" name="password" placeholder="新密码≥8位" style="width:118px;padding:6px 8px;font-size:12px" />
+									<button class="btn" name="action" value="reset" type="submit">改密</button>
+								</form>
+								<form method="post" action="/api/ops/site" style="margin:0">
+									<input type="hidden" name="id" value={s.id} />
+									<input type="hidden" name="back" value={back} />
+									<button class="btn danger" name="action" value="delete" type="submit" onclick="return confirm('删除后站点立刻 404，确定？')">删除</button>
+								</form>
+							</div>
+						</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+
+	{pages > 1 && (
+		<div class="pager">
+			<span>第 {page} / {pages} 页</span>
+			{page > 1 && <a class="btn" href={qs({ page: page - 1 })}>上一页</a>}
+			{page < pages && <a class="btn" href={qs({ page: page + 1 })}>下一页</a>}
+		</div>
+	)}
+</OpsShell>

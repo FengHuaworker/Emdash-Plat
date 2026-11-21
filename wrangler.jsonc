@@ -1,0 +1,38 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "emdash-main",
+	"main": "./src/worker.ts",
+	"routes": [
+		{ "pattern": "yerinblog.cc.cd/*", "zone_name": "yerinblog.cc.cd" },
+		{ "pattern": "main.yerinblog.cc.cd/*", "zone_name": "yerinblog.cc.cd" }
+	],
+	"compatibility_date": "2026-02-24",
+	"compatibility_flags": ["nodejs_compat"],
+	"kv_namespaces": [
+		{ "binding": "SESSION", "id": "e78bc25a9c694aa185c693aad0e5b756" }
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "emdash-main",
+			"database_id": "b333c803-a59c-4663-a18b-e2d45cde5dbf",
+		},
+	],
+	// Co-editing rooms, one Durable Object per entry being edited
+	"durable_objects": {
+		"bindings": [
+			{ "name": "EMDASH_ROOMS", "class_name": "EmDashRoom" },
+			{ "name": "DB_DO", "class_name": "EmDashDB" }
+		],
+	},
+	"exports": {
+		"EmDashRoom": { "type": "durable-object", "storage": "sqlite" },
+		"EmDashDB": { "type": "durable-object", "storage": "sqlite" },
+	},
+	// Sandboxed plugins require Worker Loader, available on Workers paid plans. Uncomment to enable:
+	// "worker_loaders": [{ "binding": "LOADER" }],
+	// General maintenance cron trigger
+	"triggers": {
+		"crons": ["* * * * *"],
+	},
+}

@@ -1,0 +1,48 @@
+---
+import OpsShell from "../../layouts/OpsShell.astro";
+import { env } from "cloudflare:workers";
+import { isOpsAuthed } from "../../lib/ops-auth";
+import { ensurePlatformTables, listEvents, type PlatformEvent } from "../../lib/platform";
+
+await ensurePlatformTables();
+const authed = isOpsAuthed(Astro.cookies, env as any);
+
+const kindLabels: Record<string, string> = {
+	"site.create": "新建站点",
+	"site.login": "站主登录",
+	"site.delete": "删除站点",
+	"site.password": "修改密码",
+	"ops.login": "运维登录",
+	"ops.settings": "改平台设置",
+	"ops.site.disable": "停用站点",
+	"ops.site.enable": "启用站点",
+	"ops.site.delete": "运维删除站点",
+	"ops.site.reset": "运维重置密码",
+	"ops.site.rename": "运维改名",
+};
+
+let rows: PlatformEvent[] = [];
+if (authed) rows = await listEvents(100);
+---
+
+<OpsShell title="操作日志" sub="最近 100 条：注册、登录、停用、改密、删除" active="events" authed={authed}>
+	<div class="card" style="padding:6px 8px">
+		<table>
+			<thead>
+				<tr><th style="width:150px">时间</th><th style="width:150px">操作</th><th style="width:150px">站点</th><th>说明</th><th style="width:130px">IP</th></tr>
+			</thead>
+			<tbody>
+				{rows.length === 0 && <tr><td colspan="5" class="muted" style="padding:26px;text-align:center">还没有记录</td></tr>}
+				{rows.map((e) => (
+					<tr>
+						<td class="muted">{new Date(e.ts * 1000).toLocaleString("zh-CN", { hour12: false })}</td>
+						<td>{kindLabels[e.kind] || e.kind}</td>
+						<td>{e.site ? <a href={`/ops/site/${e.site}`}>{e.site}</a> : <span class="muted">—</span>}</td>
+						<td class="muted">{e.detail || "—"}</td>
+						<td class="muted">{e.ip || "—"}</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+</OpsShell>

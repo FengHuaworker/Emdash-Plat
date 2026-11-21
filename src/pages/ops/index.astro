@@ -1,0 +1,127 @@
+---
+import OpsShell from "../../layouts/OpsShell.astro";
+import { env } from "cloudflare:workers";
+import { isOpsAuthed } from "../../lib/ops-auth";
+import { ensurePlatformTables, getQuota, querySites, siteStats, db, quotaReasonText, type SiteRow } from "../../lib/platform";
+import { getSettings, type PlatformSettings } from "../../lib/settings";
+import { getTraffic, slugOfHost } from "../../lib/stats";
+import { isReadOnly } from "../../lib/platform";
+
+await ensurePlatformTables();
+
+const authed = isOpsAuthed(Astro.cookies, env as any);
+const error = Astro.url.searchParams.get("error") ? "1" : "";
+const base = "yerinblog.cc.cd";
+
+let stats = { total: 0, active: 0, disabled: 0 };
+let quota = { available: false, used: 0, limit: 100000, remaining: 100000, percent: 0 };
+let recent: SiteRow[] = [];
+let today = 0;
+let settings: PlatformSettings = { registration: 1, announcement: "", ipHours: 24 };
+let readOnly = false;
+let traffic = { ok: false, today: 0, week: 0, byHost: {} as Record<string, { today: number; week: number }> };
+let topSites: { slug: string; today: number; week: number }[] = [];
+let unregistered: { slug: string; today: number; week: number }[] = [];
+
+if (authed) {
+	stats = await siteStats();
+	quota = await getQuota();
+	recent = (await querySites({ pageSize: 6 })).rows;
+	settings = await getSettings();
+	readOnly = await isReadOnly();
+	traffic = await getTraffic();
+	const known = new Set((await querySites({ pageSize: 100 })).rows.map((r) => r.id));
+	const all = Object.entries(traffic.byHost)
+		.map(([host, v]) => ({ slug: slugOfHost(host), today: v.today, week: v.week }))
+		.filter((x) => x.slug !== "main");
+	unregistered = all.filter((x) => !known.has(x.slug));
+	topSites = all.filter((x) => known.has(x.slug)).sort((a, b) => b.today - a.today).slice(0, 6);
+	const startOfDay = Math.floor(new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime() / 1000);
+	const row = await db().prepare("SELECT COUNT(*) AS n FROM platform_site WHERE created >= ?1").bind(startOfDay).first<{ n: number }>();
+	today = row?.n || 0;
+}
+---
+
+<OpsShell title="总览" sub={`YerinBlog · ${base} · 运维面板`} active="overview" authed={authed} error={error}>
+	{readOnly && (
+		<div class="card" style="border-color:#4a3a12;background:#1d1808;color:#f0d38a;margin-bottom:18px">
+			今日额度已用 {quota.percent}%，全站进入只读：前台可访问，后台写入返回 503，注册已自动关闭。
+		</div>
+	)}
+
+	<div class="grid">
+		<div class="card"><b>{stats.total}</b><span>博客总数</span></div>
+		<div class="card"><b>{stats.active}</b><span>运行中</span></div>
+		<div class="card"><b>{stats.disabled}</b><span>已停用</span></div>
+		<div class="card">
+			<b>{quota.available ? `${quota.percent}%` : "—"}</b><span>今日 Worker 额度</span>
+			<div class="bar"><i style={`width:${quota.available ? Math.max(2, quota.percent) : 0}%`}></i></div>
+			<span class="muted">{quota.available ? `剩余 ${quota.remaining.toLocaleString()} / ${quota.limit.toLocaleString()}` : quotaReasonText(quota)}</span>
+		</div>
+	</div>
+
+	<div class="grid" style="grid-template-columns:repeat(4,1fr)">
+		<div class="card">
+			<b style="font-size:20px">{traffic.ok ? traffic.today.toLocaleString() : "—"}</b><span>今日全站访问</span>
+			<div class="muted" style="margin-top:6px">近 7 天 {traffic.ok ? traffic.week.toLocaleString() : "—"}</div>
+		</div>
+		<div class="card">
+			<b style="font-size:20px">{today}</b><span>今天新增站点</span>
+		</div>
+		<div class="card">
+			<b style="font-size:20px">{settings.registration ? "开放" : "关闭"}</b><span>注册开关</span>
+			<div class="muted" style="margin-top:6px">同 IP {settings.ipHours} 小时一站</div>
+		</div>
+		<div class="card">
+			<b style="font-size:20px">{settings.announcement ? "有" : "无"}</b><span>主站公告</span>
+			<div class="muted" style="margin-top:6px">{settings.announcement || "未设置"}</div>
+		</div>
+	</div>
+
+	<div class="card" style="padding:6px 8px;margin-bottom:18px">
+		<div class="row" style="padding:12px 10px 4px;justify-content:space-between">
+			<strong style="font-size:14px">今日访问 Top</strong>
+			<span class="muted" style="font-size:12px">按 Host 统计，不含主站{unregistered.length > 0 ? ` · 另有 ${unregistered.reduce((n, x) => n + x.today, 0)} 次来自未登记子域` : ""}</span>
+		</div>
+		<table>
+			<thead><tr><th>子域</th><th style="width:120px">今日</th><th style="width:120px">近 7 天</th></tr></thead>
+			<tbody>
+				{topSites.length === 0 && <tr><td colspan="3" class="muted" style="padding:20px;text-align:center">暂无数据</td></tr>}
+				{topSites.map((t) => (
+					<tr>
+						<td><a href={`https://${t.slug}.${base}`} target="_blank" rel="noopener">{t.slug}</a></td>
+						<td>{t.today.toLocaleString()}</td>
+						<td class="muted">{t.week.toLocaleString()}</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+
+	<div class="card" style="padding:6px 8px;margin-bottom:18px">
+		<div class="row" style="padding:12px 10px 4px;justify-content:space-between">
+			<strong style="font-size:14px">最近注册</strong>
+			<a class="btn" href="/ops/sites">全部站点 →</a>
+		</div>
+		<table>
+			<thead>
+				<tr><th>子域</th><th>名称</th><th>状态</th><th>IP</th><th>时间</th><th style="width:120px">操作</th></tr>
+			</thead>
+			<tbody>
+				{recent.length === 0 && <tr><td colspan="6" class="muted" style="padding:24px;text-align:center">还没有站点</td></tr>}
+				{recent.map((s) => (
+					<tr>
+						<td><a href={`/ops/site/${s.id}`}>{s.id}</a></td>
+						<td>{s.title}</td>
+						<td><span class={`badge ${s.status ? "on" : "off"}`}>{s.status ? "运行中" : "已停用"}</span></td>
+						<td class="muted">{s.ip}</td>
+						<td class="muted">{new Date(s.created * 1000).toLocaleString("zh-CN", { hour12: false })}</td>
+						<td>
+							<a class="btn" href={`https://${s.id}.${base}/_emdash/admin`} target="_blank" rel="noopener">后台 ↗</a>
+						</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+</OpsShell>

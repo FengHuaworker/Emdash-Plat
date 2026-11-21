@@ -1,0 +1,59 @@
+---
+import { isPlatformHost } from "../lib/host";
+
+// 注册 / 登录 / 我的博客都属于平台主站；租户站访问时回主站
+if (!isPlatformHost(Astro.url.host)) {
+	return Astro.redirect("https://yerinblog.cc.cd" + Astro.url.pathname + Astro.url.search, 302);
+}
+import Base from "../layouts/Base.astro";
+
+const error = Astro.url.searchParams.get("error") || "";
+const prefill = Astro.url.searchParams.get("name") || "";
+const shownError = error;
+const action = "/api/login";
+---
+
+<Base title="登录我的博客" description="用注册时的地址和密码登录，进入你自己的博客后台。">
+	<section class="frame" style="padding:72px 0 96px;max-width:520px">
+		<p style="font-size:12px;letter-spacing:.18em;color:var(--color-text-secondary);margin:0 0 12px">SIGN IN</p>
+		<h1 style="font-size:36px;line-height:1.2;margin:0 0 10px;font-weight:600;letter-spacing:-.02em">登录我的博客</h1>
+		<p style="font-size:15px;line-height:1.8;color:var(--color-text-secondary);margin:0 0 28px">
+			用注册时填的博客地址和密码，进入自己的管理后台。
+		</p>
+
+		{shownError && (
+			<div style="border:1px solid #f3c2c2;background:#fdf0f0;color:#a33;border-radius:10px;padding:14px 16px;margin-bottom:22px;font-size:14px">
+				{shownError}
+			</div>
+		)}
+
+		<form method="post" action={action} style="display:grid;gap:16px">
+			<label style="display:grid;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+				博客地址
+				<input
+					name="name"
+					value={prefill}
+					required
+					placeholder="yourname"
+					style="border:1px solid var(--color-border,rgba(0,0,0,.14));border-radius:10px;padding:13px 14px;font-size:15px;background:var(--color-surface);color:var(--color-text)"
+				/>
+			</label>
+			<label style="display:grid;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+				密码
+				<input
+					name="password"
+					type="password"
+					required
+					style="border:1px solid var(--color-border,rgba(0,0,0,.14));border-radius:10px;padding:13px 14px;font-size:15px;background:var(--color-surface);color:var(--color-text)"
+				/>
+			</label>
+			<button type="submit" style="margin-top:6px;border:0;border-radius:10px;padding:14px 18px;font-size:15px;font-weight:600;cursor:pointer;background:var(--color-text);color:var(--color-bg)">
+				进入后台
+			</button>
+		</form>
+
+		<p style="margin:22px 0 0;font-size:13px;color:var(--color-text-secondary)">
+			还没有站点？<a href="/create" style="color:inherit;text-decoration:underline">去注册一个</a>
+		</p>
+	</section>
+</Base>

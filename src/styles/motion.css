@@ -1,0 +1,59 @@
+/* 全局动效：入场、悬停、滚动显现 */
+@keyframes yb-fade-up {
+	from { opacity: 0; transform: translate3d(0, 18px, 0); }
+	to { opacity: 1; transform: none; }
+}
+@keyframes yb-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes yb-line {
+	from { transform: scaleX(0); }
+	to { transform: scaleX(1); }
+}
+
+body { animation: yb-fade-in .5s ease both; }
+
+main > *, .frame > * { animation: yb-fade-up .7s cubic-bezier(.22,.61,.36,1) both; }
+main > *:nth-child(2), .frame > *:nth-child(2) { animation-delay: .06s; }
+main > *:nth-child(3), .frame > *:nth-child(3) { animation-delay: .12s; }
+main > *:nth-child(4), .frame > *:nth-child(4) { animation-delay: .18s; }
+main > *:nth-child(5), .frame > *:nth-child(5) { animation-delay: .24s; }
+
+[data-reveal] {
+	opacity: 0;
+	transform: translate3d(0, 22px, 0);
+	transition: opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1);
+	will-change: opacity, transform;
+}
+[data-reveal].is-in { opacity: 1; transform: none; }
+
+a, button, .card, article { transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .25s ease, box-shadow .25s ease; }
+a:hover { opacity: .82; }
+article:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after { animation: none !important; transition: none !important; }
+	[data-reveal] { opacity: 1; transform: none; }
+}
+
+/* 只读横幅 */
+.yb-readonly {
+	position: sticky; top: 0; z-index: 40;
+	background: #fff8e6; color: #7a5b12;
+	border-bottom: 1px solid #f0c36d;
+	font-size: 13px; text-align: center; padding: 9px 14px;
+	animation: yb-fade-in .4s ease both;
+}
+.yb-create-link {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 8px 14px; border-radius: 999px;
+	background: var(--color-text); color: var(--color-bg);
+	font-size: 13px; text-decoration: none; white-space: nowrap;
+}
+.yb-create-link:hover { opacity: .9; transform: translateY(-1px); }
+.yb-quota-chip {
+	font-size: 12px; color: var(--color-text-secondary);
+	padding: 4px 10px; border: 1px solid var(--color-border, rgba(0,0,0,.12));
+	border-radius: 999px; white-space: nowrap;
+}

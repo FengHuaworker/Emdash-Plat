@@ -1,0 +1,109 @@
+---
+import { isPlatformHost } from "../lib/host";
+
+// 注册 / 登录 / 我的博客都属于平台主站；租户站访问时回主站
+if (!isPlatformHost(Astro.url.host)) {
+	return Astro.redirect("https://yerinblog.cc.cd" + Astro.url.pathname + Astro.url.search, 302);
+}
+import Base from "../layouts/Base.astro";
+import { isReadOnly } from "../lib/platform";
+import { getSettings } from "../lib/settings";
+
+const readOnly = await isReadOnly();
+const settings = await getSettings();
+const registrationOpen = settings.registration === 1 && !readOnly;
+const error = Astro.url.searchParams.get("error") || "";
+const prefill = Astro.url.searchParams.get("name") || "";
+const base = (Astro.locals as any).baseDomain || "yerinblog.cc.cd";
+---
+
+<Base
+	title="创建自己的博客"
+	description="注册一个子域，立刻得到一套带后台、评论与主题的博客。"
+>
+	<section class="frame" style="padding:64px 0 96px;max-width:960px">
+		<p style="font-size:12px;letter-spacing:.18em;color:var(--color-text-secondary);margin:0 0 12px">CREATE YOUR BLOG</p>
+		<h1 style="font-size:48px;line-height:1.15;margin:0 0 14px;font-weight:600;letter-spacing:-.02em">
+			写点东西，<br />剩下的交给边缘。
+		</h1>
+		<p style="font-size:16px;line-height:1.8;color:var(--color-text-secondary);max-width:560px;margin:0 0 36px">
+			一个账号、一个子域，就有一套完整的博客：后台、评论、主题、fk 标记语言。全平台共用每天 10 万次免费额度，静态资源不计入。
+		</p>
+
+		{settings.announcement && (
+			<div style="border:1px solid #c9d8f5;background:#f3f7ff;color:#2b4a86;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:14px">
+				{settings.announcement}
+			</div>
+		)}
+
+		{!registrationOpen && (
+			<div style="border:1px solid #f0c36d;background:#fff8e6;color:#7a5b12;border-radius:10px;padding:14px 16px;margin-bottom:24px;font-size:14px">
+				{readOnly
+					? "今日额度已用完，注册暂时关闭。文章与已有博客仍可正常访问，北京时间早上 8 点恢复。"
+					: "注册暂时关闭，稍后再来看看。"}
+			</div>
+		)}
+
+		{error && (
+			<div style="border:1px solid #f3c2c2;background:#fdf0f0;color:#a33;border-radius:10px;padding:14px 16px;margin-bottom:24px;font-size:14px">
+				{error}
+			</div>
+		)}
+
+		{registrationOpen && (
+		<form method="post" action="/api/create" style="display:grid;gap:18px;max-width:560px">
+			<label style="display:grid;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+				博客地址
+				<div style="display:flex;align-items:center;gap:0;border:1px solid var(--color-border,rgba(0,0,0,.14));border-radius:10px;overflow:hidden;background:var(--color-surface)">
+					<input
+						name="name"
+						value={prefill}
+						required
+						minlength="3"
+						maxlength="32"
+						pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
+						placeholder="yourname"
+						style="flex:1;border:0;outline:0;padding:13px 14px;font-size:15px;background:transparent;color:var(--color-text)"
+					/>
+					<span style="padding:0 14px;font-size:13px;color:var(--color-text-secondary);border-left:1px solid var(--color-border,rgba(0,0,0,.14))">.{base}</span>
+				</div>
+			</label>
+
+			<label style="display:grid;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+				博客名称
+				<input
+					name="title"
+					required
+					maxlength="40"
+					placeholder="山间笔记"
+					style="border:1px solid var(--color-border,rgba(0,0,0,.14));border-radius:10px;padding:13px 14px;font-size:15px;background:var(--color-surface);color:var(--color-text)"
+				/>
+			</label>
+
+			<label style="display:grid;gap:8px;font-size:13px;color:var(--color-text-secondary)">
+				后台密码
+				<input
+					name="password"
+					type="password"
+					required
+					minlength="8"
+					placeholder="至少 8 位"
+					style="border:1px solid var(--color-border,rgba(0,0,0,.14));border-radius:10px;padding:13px 14px;font-size:15px;background:var(--color-surface);color:var(--color-text)"
+				/>
+			</label>
+
+			<button
+				type="submit"
+				disabled={readOnly}
+				style="justify-self:start;margin-top:6px;border:0;border-radius:999px;padding:13px 28px;font-size:15px;font-weight:500;cursor:pointer;background:var(--color-text);color:var(--color-bg);opacity:{readOnly ? .5 : 1}"
+			>
+				创建我的博客
+			</button>
+
+			<p style="font-size:12px;line-height:1.8;color:var(--color-text-secondary);margin:4px 0 0">
+				同一个 IP 与同一个浏览器各只能创建一个博客。创建后地址不可更改。
+			</p>
+		</form>
+		)}
+	</section>
+</Base>

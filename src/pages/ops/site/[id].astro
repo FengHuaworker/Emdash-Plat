@@ -1,0 +1,99 @@
+---
+import OpsShell from "../../../layouts/OpsShell.astro";
+import { env } from "cloudflare:workers";
+import { isOpsAuthed } from "../../../lib/ops-auth";
+import { ensurePlatformTables, getSite, type SiteRow } from "../../../lib/platform";
+import { getTraffic, getHostSeries, fillHourly, type TrafficPoint } from "../../../lib/stats";
+
+await ensurePlatformTables();
+const authed = isOpsAuthed(Astro.cookies, env as any);
+const base = "yerinblog.cc.cd";
+const id = String(Astro.params.id || "").toLowerCase();
+
+let site: SiteRow | null = null;
+let today = 0;
+let week = 0;
+let series: TrafficPoint[] = [];
+if (authed && id) {
+	site = await getSite(id);
+	const traffic = await getTraffic();
+	const host = `${id}.${base}`;
+	today = traffic.byHost[host]?.today || 0;
+	week = traffic.byHost[host]?.week || 0;
+	series = fillHourly(await getHostSeries(host, 24), 24);
+}
+const seriesMax = Math.max(1, ...series.map((p) => p.count));
+---
+
+<OpsShell title={site ? `${site.id} · ${site.title}` : "站点详情"} sub={site ? `https://${site.id}.${base}` : ""} active="sites" authed={authed}>
+	{!site ? (
+		<div class="card">没有找到这个站点。<a href="/ops/sites">返回列表</a></div>
+	) : (
+		<>
+			<div class="grid" style="grid-template-columns:repeat(4,1fr)">
+				<div class="card"><b>{today.toLocaleString()}</b><span>今日访问</span></div>
+				<div class="card"><b>{week.toLocaleString()}</b><span>近 7 天访问</span></div>
+				<div class="card"><b>{seriesMax.toLocaleString()}</b><span>24h 峰值/小时</span></div>
+				<div class="card">
+					<b style="font-size:20px">{site.status ? "运行中" : "已停用"}</b><span>状态</span>
+					<div class="muted" style="margin-top:6px">创建于 {new Date(site.created * 1000).toLocaleString("zh-CN", { hour12: false })}</div>
+				</div>
+			</div>
+
+			{series.length > 0 && (
+				<div class="card" style="margin-bottom:18px">
+					<div class="row" style="justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:10px">
+						<span>最近 24 小时</span><span>按小时聚合</span>
+					</div>
+					<div style="display:flex;align-items:flex-end;gap:3px;height:70px">
+						{series.map((p) => (
+							<div title={`${p.hour} · ${p.count}`} style={`flex:1;min-width:3px;border-radius:2px 2px 0 0;background:${p.count ? "#5b7cfa" : "#1d2230"};opacity:${p.count ? Math.max(0.3, p.count / seriesMax) : 1};height:${Math.max(4, (p.count / seriesMax) * 100)}%`}></div>
+						))}
+					</div>
+				</div>
+			)}
+
+			<div class="card" style="margin-bottom:18px">
+				<strong style="font-size:14px">基本信息</strong>
+				<table style="margin-top:8px">
+					<tbody>
+						<tr><th style="width:140px">子域</th><td><a href={`https://${site.id}.${base}`} target="_blank" rel="noopener">{site.id}.{base}</a></td></tr>
+						<tr><th>名称</th><td>{site.title}</td></tr>
+						<tr><th>注册 IP</th><td class="muted">{site.ip || "—"}</td></tr>
+						<tr><th>创建时间</th><td class="muted">{new Date(site.created * 1000).toLocaleString("zh-CN", { hour12: false })}</td></tr>
+						<tr><th>后台</th><td><a href={`https://${site.id}.${base}/_emdash/admin`} target="_blank" rel="noopener">打开 EmDash 后台 ↗</a></td></tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div class="card">
+				<strong style="font-size:14px">操作</strong>
+				<div class="row" style="margin-top:12px;gap:10px">
+					<form method="post" action="/api/ops/site" style="margin:0">
+						<input type="hidden" name="id" value={site.id} />
+						<input type="hidden" name="back" value={`/ops/site/${site.id}`} />
+						<button class="btn" name="action" value={site.status ? "disable" : "enable"} type="submit">{site.status ? "停用站点" : "启用站点"}</button>
+					</form>
+					<form method="post" action="/api/ops/site" style="margin:0;display:flex;gap:6px;align-items:center">
+						<input type="hidden" name="id" value={site.id} />
+						<input type="hidden" name="back" value={`/ops/site/${site.id}`} />
+						<input type="text" name="title" value={site.title} style="width:160px;padding:6px 8px;font-size:13px" />
+						<button class="btn" name="action" value="rename" type="submit">改名</button>
+					</form>
+					<form method="post" action="/api/ops/site" style="margin:0;display:flex;gap:6px;align-items:center">
+						<input type="hidden" name="id" value={site.id} />
+						<input type="hidden" name="back" value={`/ops/site/${site.id}`} />
+						<input type="text" name="password" placeholder="新密码≥8位" style="width:140px;padding:6px 8px;font-size:13px" />
+						<button class="btn" name="action" value="reset" type="submit">重置密码</button>
+					</form>
+					<form method="post" action="/api/ops/site" style="margin:0">
+						<input type="hidden" name="id" value={site.id} />
+						<input type="hidden" name="back" value="/ops/sites" />
+						<button class="btn danger" name="action" value="delete" type="submit" onclick="return confirm('删除后站点立刻 404，确定？')">删除站点</button>
+					</form>
+					<a class="btn" href="/ops/sites">返回列表</a>
+				</div>
+			</div>
+		</>
+	)}
+</OpsShell>

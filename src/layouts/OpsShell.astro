@@ -1,0 +1,103 @@
+---
+interface Props {
+	title: string;
+	sub?: string;
+	active: "overview" | "sites" | "settings" | "events";
+	authed: boolean;
+	error?: string;
+}
+
+const { title, sub = "", active, authed, error = "" } = Astro.props;
+const nav = [
+	{ href: "/ops", label: "总览", key: "overview" },
+	{ href: "/ops/sites", label: "站点", key: "sites" },
+	{ href: "/ops/settings", label: "设置", key: "settings" },
+	{ href: "/ops/events", label: "日志", key: "events" },
+];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>{title} · 运维 · YerinBlog</title>
+		<style is:global>
+			:root { color-scheme: dark; --bg:#0b0d12; --panel:#12151d; --line:#222735; --text:#e8ebf2; --muted:#8b93a7; --accent:#5b7cfa; }
+			* { box-sizing: border-box; }
+			body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif; }
+			a { color:#8aa4ff; text-decoration:none; }
+			.top { border-bottom:1px solid var(--line); background:#0d1017; position:sticky; top:0; z-index:10; }
+			.top__in { max-width:1180px; margin:0 auto; padding:0 24px; height:56px; display:flex; align-items:center; gap:24px; }
+			.brand { font-weight:600; letter-spacing:-.01em; }
+			.nav { display:flex; gap:4px; margin-left:8px; }
+			.nav a { color:var(--muted); padding:7px 12px; border-radius:8px; font-size:13px; }
+			.nav a:hover { background:#161a24; color:var(--text); }
+			.nav a[aria-current="page"] { background:#1a2030; color:var(--text); }
+			.top__right { margin-left:auto; display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+			.wrap { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+			h1 { font-size:24px; margin:0 0 6px; font-weight:600; }
+			.sub { color:var(--muted); font-size:13px; margin:0 0 26px; }
+			.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:22px; }
+			.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+			.card b { display:block; font-size:26px; font-weight:600; letter-spacing:-.01em; }
+			.card span { color:var(--muted); font-size:12px; }
+			.bar { height:6px; border-radius:3px; background:#1d2230; overflow:hidden; margin:10px 0 6px; }
+			.bar i { display:block; height:100%; background:var(--accent); }
+			table { width:100%; border-collapse:collapse; }
+			th,td { text-align:left; padding:11px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+			th { color:var(--muted); font-weight:500; font-size:12px; }
+			tr:hover td { background:#0f131b; }
+			.badge { font-size:11px; padding:2px 8px; border-radius:999px; }
+			.on { background:#132a1c; color:#5fd08a; }
+			.off { background:#2a1a1a; color:#f08a8a; }
+			.btn { border:1px solid var(--line); background:#161a24; color:var(--text); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; text-decoration:none; display:inline-block; }
+			.btn:hover { background:#1d2331; }
+			.btn.danger { border-color:#3a2226; color:#f08a8a; }
+			.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+			input[type=text], input[type=password], textarea, select { background:#0f131b; border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px 12px; font-size:14px; width:100%; font-family:inherit; }
+			.row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+			.muted { color:var(--muted); }
+			.err { color:#f08a8a; font-size:13px; margin-top:10px; }
+			.login { max-width:380px; margin:110px auto; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; }
+			.field { display:grid; gap:6px; margin-bottom:14px; font-size:13px; color:var(--muted); }
+			.pager { display:flex; gap:6px; align-items:center; justify-content:flex-end; margin-top:14px; font-size:12px; color:var(--muted); }
+		</style>
+	</head>
+	<body>
+		{authed && (
+			<div class="top">
+				<div class="top__in">
+					<span class="brand">YerinBlog 运维</span>
+					<nav class="nav">
+						{nav.map((n) => (
+							<a href={n.href} aria-current={active === n.key ? "page" : undefined}>{n.label}</a>
+						))}
+					</nav>
+					<div class="top__right">
+						<a href="https://yerinblog.cc.cd" target="_blank" rel="noopener">主站 ↗</a>
+						<form method="post" action="/api/ops/logout" style="margin:0">
+							<button class="btn" type="submit">退出</button>
+						</form>
+					</div>
+				</div>
+			</div>
+		)}
+		{authed ? (
+			<div class="wrap">
+				<h1>{title}</h1>
+				{sub && <p class="sub">{sub}</p>}
+				<slot />
+			</div>
+		) : (
+			<form class="login" method="post" action="/api/ops/login">
+				<h1 style="font-size:20px">运维登录</h1>
+				<p class="sub">输入运维密码进入管理面板。</p>
+				<input type="password" name="password" placeholder="运维密码" autofocus />
+				{error && <div class="err">密码不正确</div>}
+				<button class="btn primary" type="submit" style="margin-top:14px;width:100%;padding:11px">进入</button>
+			</form>
+		)}
+	</body>
+</html>
