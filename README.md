@@ -88,11 +88,13 @@ npx astro build
 npx wrangler deploy -c dist/server/wrangler.json
 
 # 租户站（Durable Objects）
-YB_SITES=1 npx astro build
+YB_SITES=1 RAYON_NUM_THREADS=1 npx astro build
 npx wrangler deploy -c wrangler.sites.jsonc
 ```
 
-> 内存较小的机器上构建可能 OOM，建议 `env -u NODE_OPTIONS` 后执行。
+> **内存不足时**：Rolldown 并行构建在 8GB 机器上容易 `memory allocation failed`。
+> 加上 `RAYON_NUM_THREADS=1 NODE_OPTIONS=--max-old-space-size=1536` 可稳定通过。
+> 若 `NODE_OPTIONS` 已被外部设为较小的值，先 `env -u NODE_OPTIONS` 清掉。
 
 ## 注册流程
 
